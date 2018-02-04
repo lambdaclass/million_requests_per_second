@@ -17,20 +17,24 @@ init(ListenerPid, Socket, Transport) ->
         {ok, Packet} ->
             Data = remove_header(Packet),
             process(Socket, Transport, Data),
-            loop(Socket, Transport, <<>>);
+            Time = erlang:timestamp(),
+            loop(Socket, Transport, <<>>, Time);
         {error, _} ->
             ok
     end.
 
-loop(Socket, Transport, Buffer) ->
+loop(Socket, Transport, Buffer, Time) ->
     case Transport:recv(Socket, 0, 30000) of
         {ok, Packet} ->
             Buffer2 = << Buffer/binary, Packet/binary >>,
             Data = remove_header(Buffer2),
             case process(Socket, Transport, Data) of
                 {ok, Rest} ->
-                    loop(Socket, Transport, Rest);
+                    loop(Socket, Transport, Rest, Time);
                 close ->
+                    EndTime = erlang:timestamp(),
+                    Diff = timer:now_diff(EndTime, Time),
+                    io:format("TimeDiff ~p~n", [Diff]),
                     Transport:close(Socket)
                 end;
         {error, _} ->
@@ -41,8 +45,7 @@ process(Socket, Transport, <<1, 0>>) ->
     ok = Transport:send(Socket, add_header(<<2, 0>>)),
     {ok, <<>>};
 process(Socket, Transport, <<3, 4, Number:32>>) ->
-    Number2 = Number + 1,
-    ok = Transport:send(Socket, add_header(<<4, 4, Number2:32>>)),
+    ok = Transport:send(Socket, add_header(<<4, 4, Number:32>>)),
     {ok, <<>>};
 process(Socket, Transport, <<5, 0>>) ->
     ok = Transport:send(Socket, add_header(<<6, 0>>)),

@@ -13,10 +13,9 @@ client(M) ->
     case connect() of
         {ok, Socket} ->
             [{ok, _} = send(Socket, I) || I <- lists:seq(1, M)],
-            close(Socket),
-            error;
+            close(Socket);
         {error, Error} ->
-            error
+            {error, Error}
     end.
 
 connect() ->
