@@ -12,7 +12,7 @@ start_link(N, M) ->
 client(M) ->
     case connect() of
         {ok, Socket} ->
-            [{ok, _} = send(Socket, I) || I <- lists:seq(1, M)],
+            send_receive(Socket, M),
             close(Socket);
         {error, Error} ->
             {error, Error}
@@ -32,8 +32,21 @@ close(Socket) ->
     ok = gen_tcp:send(Socket, <<230, 1, 5, 0>>),
     gen_tcp:close(Socket).
 
+send_receive(Socket, N) ->
+    send_receive(Socket, N, 0).
+
+send_receive(Socket, N, N) ->
+    ok = send(Socket, N),
+    {ok, N} = recv(Socket);
+send_receive(Socket, N, I) ->
+    ok = send(Socket, I),
+    {ok, I} = recv(Socket),
+    send_receive(Socket, N, I + 1).
+
 send(Socket, Number) ->
-    ok = gen_tcp:send(Socket, <<230, 1, 3, 4, Number:32>>),
+    gen_tcp:send(Socket, <<230, 1, 3, 4, Number:32>>).
+
+recv(Socket) ->
     {ok, Packet} = gen_tcp:recv(Socket, 0, 30000),
-    <<230, 1, 4, 4, Number2:32>> = Packet,
-    {ok, Number2}.
+    <<230, 1, 4, 4, Number:32>> = Packet,
+    {ok, Number}.
