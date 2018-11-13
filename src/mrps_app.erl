@@ -11,4 +11,5 @@ start(_StartType, _StartArgs) ->
     mrps_sup:start_link().
 
 stop(_State) ->
+    ranch:stop_listener(mrps),
     ok.
