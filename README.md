@@ -6,13 +6,14 @@ In this project we set up a server that accepts connections from a number of cli
 
 ### Server
 
-Handles client subscription/unsubscription. Echoes messages received from one client to the rest.  
-
+- Handles client subscribe/unsubscribe. 
+- Broadcasts messages received from one client to the rest.  
 
 
 ### Client
 
-Sends a message to server every `n` seconds. Receives messages sent from other clients.
+- Sends a message to the server every `N` seconds.
+- Receives messages from the server (originally sent by another client).
 
 ### Protocol
 
