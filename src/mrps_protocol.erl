@@ -1,62 +1,39 @@
 -module(mrps_protocol).
 
+-behaviour(ranch_protocol).
+
 -export([start_link/4,
-         init/3]).
+         init/4]).
 
 -define(IDENTIFIER, 230).
 -define(VERSION, 1).
 
-start_link(ListenerPid, Socket, Transport, _Opts) ->
-    Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport]),
+start_link(ListenerPid, Socket, Transport, [Register]) ->
+    Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport, Register]),
     {ok, Pid}.
 
-init(ListenerPid, Socket, Transport) ->
-    ok = ranch:accept_ack(ListenerPid),
-    ok = inet:setopts(Socket, [{nodelay, true}]),
+init(ListenerPid, _Socket, Transport, Register) ->
+    {ok, Socket} = ranch:handshake(ListenerPid),
+    ok = Transport:setopts(Socket, {nodelay, true}),
+
+    Transport:send(Socket, <<?IDENTIFIER, ?VERSION>>),
+    loop(Socket, Transport, Register).
+
+
+loop(Socket, Transport, Register) ->
     case Transport:recv(Socket, 0, 30000) of
-        {ok, Packet} ->
-            Data = remove_header(Packet),
-            process(Socket, Transport, Data),
-            Time = erlang:timestamp(),
-            loop(Socket, Transport, <<>>, Time);
+        {ok, <<"SEND", Message/binary>>} ->
+            Clients = mrps_register:get_all(Register),
+            send_msg(Message, Clients, self()),
+            loop(Socket, Transport, Register);
         {error, _} ->
             ok
     end.
 
-loop(Socket, Transport, Buffer, Time) ->
-    case Transport:recv(Socket, 0, 30000) of
-        {ok, Packet} ->
-            Buffer2 = << Buffer/binary, Packet/binary >>,
-            Data = remove_header(Buffer2),
-            case process(Socket, Transport, Data) of
-                {ok, Rest} ->
-                    loop(Socket, Transport, Rest, Time);
-                close ->
-                    EndTime = erlang:timestamp(),
-                    Diff = timer:now_diff(EndTime, Time),
-                    io:format("TimeDiff ~p~n", [Diff]),
-                    Transport:close(Socket)
-                end;
-        {error, _} ->
-            ok
-    end.
-
-process(Socket, Transport, <<1, 0>>) ->
-    ok = Transport:send(Socket, add_header(<<2, 0>>)),
-    {ok, <<>>};
-process(Socket, Transport, <<3, 4, Number:32>>) ->
-    ok = Transport:send(Socket, add_header(<<4, 4, Number:32>>)),
-    {ok, <<>>};
-process(Socket, Transport, <<5, 0>>) ->
-    ok = Transport:send(Socket, add_header(<<6, 0>>)),
-    close;
-process(_Socket, _Transport, Data) ->
-    io:format("Received malformed package ~p~n", [Data]),
-    {ok, <<>>}.
-
-add_header(Data) ->
-    <<?IDENTIFIER, ?VERSION, Data/binary>>.
-
-remove_header(Packet) ->
-    <<?IDENTIFIER, ?VERSION, Data/binary>> = Packet,
-    Data.
+send_msg(_Message, [], _Sender) ->
+    done;
+send_msg(Message, [{Sender, _Socket, _Transport} | Rest], Sender) ->
+    send_msg(Message, Rest, Sender);
+send_msg(Message, [{_Pid, Socket, Transport} | Rest], Sender) ->
+    Transport:send(Socket, Message),
+    send_msg(Message, Rest, Sender).
