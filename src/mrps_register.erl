@@ -8,12 +8,12 @@ behaviour_info(callbacks) ->
 behaviour_info(_) ->
     undefined.
 
-start(Module, Args) ->
-    erlang:apply(Module, init, Args).
+start(Register, Args) ->
+    Register:init(Args).
 
-get_all(Module) ->
-    erlang:apply(Module, get_clients, []).
+get_all(Register) ->
+    Register:get_clients().
 
-store(Module, Client) ->
-    erlang:apply(Module, store_client, [Client]).
+store(Register, Client) ->
+    Register:store(Client).
     
