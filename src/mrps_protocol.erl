@@ -4,18 +4,22 @@
 -behaviour(ranch_protocol).
 
 %% gen_server
--export([handle_call/3, handle_cast/2, handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 %% ranch_protocol
--export([start_link/4,
-         init/4]).
+-export([start_link/4]).
 
 -define(IDENTIFIER, 230).
 -define(VERSION, 1).
 
 
 %% ranch_protocol
-init(ListenerPid, _Socket, Transport, _Opts) ->
+start_link(ListenerPid, Socket, Transport, Opts) ->
+    proc_lib:start_link(?MODULE, init, [[ListenerPid, Socket, Transport, Opts]]).
+
+
+%% gen_server
+init([ListenerPid, _Socket, Transport, _Opts]) ->
     ok = proc_lib:init_ack({ok, self()}),
     ok = ranch:accept_ack(ListenerPid),
     {ok, Socket} = ranch:handshake(ListenerPid),
@@ -23,11 +27,6 @@ init(ListenerPid, _Socket, Transport, _Opts) ->
 
     Transport:send(Socket, <<?IDENTIFIER, ?VERSION>>),
     gen_server:enter_loop(?MODULE, [], #{socket => Socket, transport => Transport}).
-
-
-%% gen_server
-start_link(ListenerPid, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, init, [[ListenerPid, Socket, Transport, Opts]]).
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
