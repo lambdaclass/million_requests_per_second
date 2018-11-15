@@ -2,17 +2,17 @@
 
 -behaviour(mrps_register).
 
--export([init/1, store_client/1, get_clients/0]).
+-export([init/1, store_client/1, for_each/1]).
 
 init(_Args) ->
     ets:new(clients, [set, named_table]).
 
-store_client(Client={_Pid, _Socket, _Transport}) ->
+store_client(Client) ->
     ets:insert(clients, Client).
 
-get_clients() ->
+for_each(Func) ->
     ets:foldl(
-        fun(Client, Acc) -> [Client | Acc] end, 
+        fun(Client, _Acc) -> Func(Client) end, 
         [],
         clients  
     ).

@@ -1,39 +1,47 @@
 -module(mrps_protocol).
 
 -behaviour(ranch_protocol).
+-behaviour(gen_server).
 
--export([start_link/4,
-         init/4]).
+-export([start_link/4]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -define(IDENTIFIER, 230).
 -define(VERSION, 1).
 
-start_link(ListenerPid, Socket, Transport, [Register]) ->
-    Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport, Register]),
-    {ok, Pid}.
 
-init(ListenerPid, _Socket, Transport, Register) ->
+%% ranch_protocol
+start_link(ListenerPid, Socket, Transport, [Register]) ->
+    proc_lib:start_link(?MODULE, init, [[ListenerPid, Socket, Transport, Register]]).
+
+%% gen_server
+init([ListenerPid, _Socket, Transport, Register]) ->
     {ok, Socket} = ranch:handshake(ListenerPid),
-    ok = Transport:setopts(Socket, {nodelay, true}),
+    mrps_register:store(Register, {ListenerPid}),
+    ok = Transport:setopts(Socket, {nodelay, true}, {active, once}),
 
     Transport:send(Socket, <<?IDENTIFIER, ?VERSION>>),
-    loop(Socket, Transport, Register).
+    gen_server:enter_loop(?MODULE, [], 
+        #{socket => Socket, transport => Transport, register => Register}).
 
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
 
-loop(Socket, Transport, Register) ->
-    case Transport:recv(Socket, 0, 30000) of
-        {ok, <<"SEND", Message/binary>>} ->
-            Clients = mrps_register:get_all(Register),
-            send_msg(Message, Clients, self()),
-            loop(Socket, Transport, Register);
-        {error, _} ->
-            ok
-    end.
-
-send_msg(_Message, [], _Sender) ->
-    done;
-send_msg(Message, [{Sender, _Socket, _Transport} | Rest], Sender) ->
-    send_msg(Message, Rest, Sender);
-send_msg(Message, [{_Pid, Socket, Transport} | Rest], Sender) ->
+handle_cast({msg, Message}, State=#{socket := Socket, transport := Transport}) ->
     Transport:send(Socket, Message),
-    send_msg(Message, Rest, Sender).
+    {noreply, State};
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info({tcp, _Socket, <<"SEND", Message/binary>>}, State=#{register := Register}) ->
+    mrps_register:for_each(Register, send_msg(Message)),
+    {noreply, State};
+handle_info({tcp_closed, _Socket}, State) ->
+    {stop, normal, State};
+handle_info({tcp_error, _Socket, Reason}, State) ->
+    {stop, Reason, State};
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+send_msg(Message) ->
+    fun(Client) -> gen_server:cast(Client, {msg, Message}) end.
