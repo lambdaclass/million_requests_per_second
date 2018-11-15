@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 -export([start_link/4]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(IDENTIFIER, 230).
 -define(VERSION, 1).
@@ -42,6 +42,10 @@ handle_info({tcp_error, _Socket, Reason}, State) ->
     {stop, Reason, State};
 handle_info(_Info, State) ->
     {noreply, State}.
+
+terminate(_Reason, #{register := Register}) ->
+    mrps_register:remove(Register, self()),
+    ok.
 
 send_msg(Message) ->
     fun(Client) -> gen_server:cast(Client, {msg, Message}) end.

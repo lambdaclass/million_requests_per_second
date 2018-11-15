@@ -2,7 +2,7 @@
 
 -behaviour(mrps_register).
 
--export([init/1, store_client/1, for_each/1]).
+-export([init/1, store_client/1, remove_client/1, for_each/1]).
 
 init(_Args) ->
     ets:new(clients, [set, named_table]).
@@ -10,9 +10,12 @@ init(_Args) ->
 store_client(Client) ->
     ets:insert(clients, Client).
 
+remove_client(Client) ->
+    ets:delete(clients, Client).
+
 for_each(Func) ->
     ets:foldl(
-        fun(Client, _Acc) -> Func(Client) end, 
+        fun({Client}, _Acc) -> Func(Client) end, 
         [],
         clients  
     ).
