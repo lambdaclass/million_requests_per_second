@@ -12,12 +12,10 @@ start(Register, Args) ->
     Register:init(Args).
 
 store(Register, Client) ->
-    Register:store(Client).
+    Register:store_client(Client).
 
 remove(Register, Client) ->
-    Register:remove(Client).
+    Register:remove_client(Client).
 
 for_each(Register, Func) ->
     Register:for_each(Func).
-
-    
