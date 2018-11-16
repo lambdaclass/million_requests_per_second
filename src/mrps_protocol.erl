@@ -15,7 +15,7 @@ start_link(ListenerPid, Socket, Transport, [Register]) ->
 %% gen_server
 init([ListenerPid, _Socket, Transport, Register]) ->
     {ok, Socket} = ranch:handshake(ListenerPid),
-    mrps_register:store(Register, {self()}),
+    mrps_register:store(Register, self()),
     ok = Transport:setopts(Socket, [{nodelay, true}, {active, once}]),
 
     Transport:send(Socket, <<"connected\n">>),

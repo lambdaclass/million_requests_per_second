@@ -8,7 +8,7 @@ init(_Args) ->
     ets:new(clients, [set, public, named_table]).
 
 store_client(Client) ->
-    ets:insert(clients, Client).
+    ets:insert(clients, {Client}).
 
 remove_client(Client) ->
     ets:delete(clients, Client).
