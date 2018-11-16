@@ -15,7 +15,7 @@ start_link(ListenerPid, Socket, Transport, [Register]) ->
 %% gen_server
 init([ListenerPid, _Socket, Transport, Register]) ->
     {ok, Socket} = ranch:handshake(ListenerPid),
-    mrps_register:store(Register, self()),
+    Register:store_client(self()),
     ok = Transport:setopts(Socket, [{nodelay, true}, {active, once}]),
 
     Transport:send(Socket, <<"connected\n">>),
@@ -33,12 +33,12 @@ handle_cast(_Msg, State) ->
 
 handle_info({tcp, _Socket, <<"SEND", Message/binary>>}, 
             State=#{socket := Socket, transport := Transport, register := Register}) ->
-    mrps_register:for_each(Register, send_msg(Message, self())),
+    Register:for_each(send_msg(Message, self())),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 handle_info({tcp, _Socket, <<"COUNT\n">>}, 
             State=#{socket := Socket, transport := Transport, register := Register}) ->
-    Count = mrps_register:count(Register),
+    Count = Register:count(),
     BinaryCount = list_to_binary(integer_to_list(Count)),
     ok = Transport:send(Socket, [BinaryCount, <<"\n">>]),
     ok = Transport:setopts(Socket, [{active, once}]),
@@ -56,7 +56,7 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, #{socket := Socket, transport := Transport, register := Register}) ->
     ok = Transport:close(Socket),
-    mrps_register:remove(Register, self()),
+    Register:remove_client(self()),
     ok.
 
 send_msg(Message, Sender) ->
