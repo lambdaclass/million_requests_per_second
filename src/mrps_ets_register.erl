@@ -2,7 +2,7 @@
 
 -behaviour(mrps_register).
 
--export([init/1, store_client/1, remove_client/1, for_each/1]).
+-export([init/1, store_client/1, remove_client/1, for_each/1, size/0]).
 
 init(_Args) ->
     ets:new(clients, [set, public, named_table]).
@@ -19,3 +19,6 @@ for_each(Func) ->
         [],
         clients  
     ).
+
+size() ->
+    ets:info(clients, size).

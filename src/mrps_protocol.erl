@@ -27,13 +27,21 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({msg, Message}, State=#{socket := Socket, transport := Transport}) ->
     ok = Transport:send(Socket, Message),
-    ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({tcp, _Socket, <<"SEND", Message/binary>>}, State=#{register := Register}) ->
-    mrps_register:for_each(Register, send_msg(Message)),
+handle_info({tcp, _Socket, <<"SEND", Message/binary>>}, 
+            State=#{socket := Socket, transport := Transport, register := Register}) ->
+    mrps_register:for_each(Register, send_msg(Message, self())),
+    ok = Transport:setopts(Socket, [{active, once}]),
+    {noreply, State};
+handle_info({tcp, Socket, <<"COUNT\n">>}, 
+            State=#{socket := Socket, transport := Transport, register := Register}) ->
+    Count = mrps_register:count(Register),
+    BinaryCount = list_to_binary(integer_to_list(Count)),
+    ok = Transport:send(Socket, [BinaryCount, <<"\n">>]),
+    ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 handle_info({tcp_closed, _Socket}, State) ->
     {stop, normal, State};
@@ -47,5 +55,9 @@ terminate(_Reason, #{socket := Socket, transport := Transport, register := Regis
     mrps_register:remove(Register, self()),
     ok.
 
-send_msg(Message) ->
-    fun (Client) -> gen_server:cast(Client, {msg, Message}) end.
+send_msg(Message, Sender) ->
+    fun (Client) when Client =:= Sender ->
+            pass;
+        (Client) ->
+            gen_server:cast(Client, {msg, Message})
+    end.
