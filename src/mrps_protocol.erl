@@ -36,11 +36,15 @@ handle_info({tcp, _Socket, <<"SEND", Message/binary>>},
     mrps_register:for_each(Register, send_msg(Message, self())),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
-handle_info({tcp, Socket, <<"COUNT\n">>}, 
+handle_info({tcp, _Socket, <<"COUNT\n">>}, 
             State=#{socket := Socket, transport := Transport, register := Register}) ->
     Count = mrps_register:count(Register),
     BinaryCount = list_to_binary(integer_to_list(Count)),
     ok = Transport:send(Socket, [BinaryCount, <<"\n">>]),
+    ok = Transport:setopts(Socket, [{active, once}]),
+    {noreply, State};
+handle_info({tcp, _Socket, _Data}, 
+            State=#{socket := Socket, transport := Transport}) ->
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 handle_info({tcp_closed, _Socket}, State) ->
