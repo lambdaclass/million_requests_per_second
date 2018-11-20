@@ -26,7 +26,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({msg, Message}, State=#{socket := Socket, transport := Transport}) ->
-    ok = Transport:send(Socket, Message),
+    Transport:send(Socket, Message),
     {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.

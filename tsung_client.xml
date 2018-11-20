@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
+<tsung version="1.0">
+    <clients>
+        <client host="localhost" use_controller_vm="true" maxusers="10000" />
+    </clients>
+
+    <servers>
+        <server host="load-server.lambdaclass.com" port="6969" type="tcp" />
+    </servers>
+
+    <load>
+        <arrivalphase phase="1" duration="100" unit="second">
+            <users maxnumber="10000" arrivalrate="1000" unit="second" />
+        </arrivalphase>
+    </load>
+
+    <options>
+        <option name="ports_range" min="1025" max="65535"/>
+        <option name="global_number" value ="10000"/>
+    </options>
+
+    <sessions>
+        <session probability="100" name="raw" type="ts_raw">
+            <thinktime value="wait_global"></thinktime>
+        </session>
+    </sessions>
+</tsung>
