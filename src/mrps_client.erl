@@ -1,52 +1,57 @@
 -module(mrps_client).
 
--export([start_link/2,
-         client/1]).
+-behaviour(gen_server).
 
+-export([start_link/0, send_message/2, count/1, stop/1]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
-start_link(N, M) ->
-    [spawn_link(fun() ->
-                        ok = client(M)
-                end) || _ <- lists:seq(1, N)].
+-define(SERVER, "127.0.0.1").
+-define(PORT, 6969).
 
-client(M) ->
-    case connect() of
-        {ok, Socket} ->
-            send_receive(Socket, M),
-            close(Socket);
-        {error, Error} ->
-            {error, Error}
-    end.
+%% API
+start_link() ->
+    gen_server:start_link(?MODULE, [], []).
 
-connect() ->
-    case gen_tcp:connect("127.0.0.1", 6969, [{active, false}, binary, {reuseaddr, true}]) of
-        {ok, Sock} ->
-            ok = gen_tcp:send(Sock, <<230, 1, 1, 0>>),
-            {ok, <<230, 1, 2, 0>>} = gen_tcp:recv(Sock, 0, 30000),
-            {ok, Sock};
-        {error, Error} ->
-            {error, Error}
-    end.
+send_message(Client, Message) ->
+    gen_server:call(Client, {msg, Message}).
 
-close(Socket) ->
-    ok = gen_tcp:send(Socket, <<230, 1, 5, 0>>),
+count(Client) ->
+    {ok, Count} = gen_server:call(Client, count),
+    io:format("Number of connected clients is ~s", [Count]).
+
+stop(Client) ->
+    gen_server:call(Client, stop).
+
+%% gen_server
+init(_Opts) ->
+    connect(?SERVER, ?PORT).
+
+handle_call({msg, Message}, _From, Socket) ->
+    ok = gen_tcp:send(Socket, [<<"SEND">>, Message]),
+    {reply, ok, Socket};
+handle_call(count, _From, Socket) ->
+    ok = gen_tcp:send(Socket, <<"COUNT\n">>),
+    Response = gen_tcp:recv(Socket, 0, 30000),
+    {reply, Response, Socket};
+handle_call(stop, _From, State) ->
+    {stop, normal, stopped, State};
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, Socket) ->
     gen_tcp:close(Socket).
 
-send_receive(Socket, N) ->
-    send_receive(Socket, N, 0).
-
-send_receive(Socket, N, N) ->
-    ok = send(Socket, N),
-    {ok, N} = recv(Socket);
-send_receive(Socket, N, I) ->
-    ok = send(Socket, I),
-    {ok, I} = recv(Socket),
-    send_receive(Socket, N, I + 1).
-
-send(Socket, Number) ->
-    gen_tcp:send(Socket, <<230, 1, 3, 4, Number:32>>).
-
-recv(Socket) ->
-    {ok, Packet} = gen_tcp:recv(Socket, 0, 30000),
-    <<230, 1, 4, 4, Number:32>> = Packet,
-    {ok, Number}.
+connect(Server, Port) ->
+    case gen_tcp:connect(Server, Port, [{active, false}, binary, {reuseaddr, true}]) of
+        {ok, Socket} ->
+            {ok, <<"connected\n">>} = gen_tcp:recv(Socket, 0, 30000),
+            {ok, Socket};
+        {error, Error} ->
+            {error, Error}
+    end.
