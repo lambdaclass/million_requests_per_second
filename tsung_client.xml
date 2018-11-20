@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!DOCTYPE tsung SYSTEM "/usr/local/Cellar/tsung/1.7.0/share/tsung/tsung-1.0.dtd">
+<tsung version="1.0">
+    <clients>
+        <client host="localhost" use_controller_vm="true" maxusers="10000" />
+    </clients>
+
+    <servers>
+        <server host="load-server.lambdaclass.com" port="6969" type="tcp" />
+    </servers>
+
+    <load>
+        <arrivalphase phase="1" duration="100" unit="second">
+            <users maxnumber="10000" arrivalrate="1000" unit="second" />
+        </arrivalphase>
+    </load>
+
+    <options>
+        <option name="ports_range" min="1025" max="65535"/>
+    </options>
+
+    <sessions>
+        <session probability="100" name="raw" type="ts_raw">
+            <transaction name="sendmsg">
+                <request> <raw data="SENDBOOBS" ack="no_ack"></raw> </request>
+            </transaction>
+
+            <thinktime value="4"/>
+            <request> <raw datasize="2048" ack="local"></raw> </request>
+            <transaction name="bye">
+                <request> <raw data="BYEBYE" ack="local"></raw> </request>
+            </transaction>
+        </session>
+    </sessions>
+</tsung>
