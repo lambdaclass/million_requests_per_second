@@ -21,9 +21,7 @@
 
     <sessions>
         <session probability="100" name="raw" type="ts_raw">
-            <transaction name="sendmsg">
-                <request> <raw data="SENDPICS" ack="no_ack"></raw> </request>
-            </transaction>
+            <thinktime value='wait_global'>
         </session>
     </sessions>
 </tsung>
