@@ -17,11 +17,12 @@
 
     <options>
         <option name="ports_range" min="1025" max="65535"/>
+        <option name="global_number" value ="10000"/>
     </options>
 
     <sessions>
         <session probability="100" name="raw" type="ts_raw">
-            <thinktime value='wait_global'>
+            <thinktime value="wait_global"></thinktime>
         </session>
     </sessions>
 </tsung>
