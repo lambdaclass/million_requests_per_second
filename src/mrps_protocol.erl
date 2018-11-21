@@ -20,18 +20,17 @@ loop(Socket, Transport, Register) ->
     receive
         {msg, Message} ->
             Transport:send(Socket, Message),
-			loop(Socket, Transport, Register);
-		{tcp, Socket, <<"SEND", Message/binary>>} ->
+            loop(Socket, Transport, Register);
+        {tcp, Socket, <<"SEND", Message/binary>>} ->
             Register:for_each(send_msg(Message, self())),
-			ok = Transport:setopts(Socket, [{active, once}]),
-			loop(Socket, Transport, Register);
-		{tcp, Socket, <<"COUNT\n">>} ->
-            Count = Register:count(),
-            BinaryCount = list_to_binary(integer_to_list(Count)),
-            Transport:send(Socket, [BinaryCount, <<"\n">>]),
             ok = Transport:setopts(Socket, [{active, once}]),
-			loop(Socket, Transport, Register);            
-		{tcp_closed, Socket} ->
+            loop(Socket, Transport, Register);
+        {tcp, Socket, <<"COUNT\n">>} ->
+            Count = integer_to_binary(Register:count()),
+            Transport:send(Socket, [Count, <<"\n">>]),
+            ok = Transport:setopts(Socket, [{active, once}]),
+            loop(Socket, Transport, Register);            
+        {tcp_closed, Socket} ->
             close(Socket, Transport, Register);
         {tcp_closed, Socket, _Reason} ->
             close(Socket, Transport, Register)
