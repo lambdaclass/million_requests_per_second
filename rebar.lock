@@ -1,6 +1,12 @@
 {"1.1.0",
-[{<<"ranch">>,{pkg,<<"ranch">>,<<"1.7.0">>},0}]}.
+[{<<"gproc">>,{pkg,<<"gproc">>,<<"0.8.0">>},0},
+ {<<"ranch">>,{pkg,<<"ranch">>,<<"1.7.0">>},0},
+ {<<"syn">>,
+  {git,"git://github.com/ostinelli/syn.git",
+       {ref,"9bfe15189e52589a2a831755f26fb3966ab76701"}},
+  0}]}.
 [
 {pkg_hash,[
+ {<<"gproc">>, <<"CEA02C578589C61E5341FCE149EA36CCEF236CC2ECAC8691FBA408E7EA77EC2F">>},
  {<<"ranch">>, <<"9583F47160CA62AF7F8D5DB11454068EAA32B56EEADF984D4F46E61A076DF5F2">>}]}
 ].
