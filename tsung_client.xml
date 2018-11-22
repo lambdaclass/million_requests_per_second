@@ -2,27 +2,46 @@
 <!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
 <tsung version="1.0">
     <clients>
-        <client host="localhost" use_controller_vm="true" maxusers="10000" />
+        <client host="localhost" use_controller_vm="true" maxusers="20001" />
     </clients>
 
     <servers>
         <server host="load-server.lambdaclass.com" port="6969" type="tcp" />
     </servers>
 
-    <load>
-        <arrivalphase phase="1" duration="100" unit="second">
-            <users maxnumber="10000" arrivalrate="1000" unit="second" />
-        </arrivalphase>
+    <load duration="5" unit="minute">
+        <arrivalphase phase="1" duration="50" unit="second">
+        	<users maxnumber="20000" arrivalrate="500" unit="second" />
+    	</arrivalphase>
+	    <user session="send_message" start_time="0" unit="second"></user>
     </load>
 
     <options>
-        <option name="ports_range" min="1025" max="65535"/>
-        <option name="global_number" value ="10000"/>
+	    <option name="ports_range" min="1025" max="65535"/>
+        <option name="global_number" value ="20001"/>
     </options>
 
     <sessions>
-        <session probability="100" name="raw" type="ts_raw">
-            <thinktime value="wait_global"></thinktime>
+	    <session probability="100" name="raw" type="ts_raw">
+            <request>
+                <match do="continue" when="match">connected\n</match>
+                <raw datasize="8" ack="local"></raw>
+            </request>
+            <for var="i" from="1" to="30" incr="1">
+                <thinktime value="wait_global" />
+                <thinktime value="5" />
+                <request>
+                    <match do="continue" when="match">HELLO</match>
+                    <raw datasize="8" ack="local"></raw>
+                </request>
+            </for>
+	    </session>
+        <session probability="0" name="send_message" type="ts_raw">
+            <for var="i" from="1" to="30" incr="1">
+                <thinktime value="wait_global" />
+                <request> <raw data="SENDHELLO" ack="no_ack"></raw> </request>
+                <thinktime value="10" />
+            </for>
         </session>
     </sessions>
 </tsung>
