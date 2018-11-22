@@ -38,9 +38,8 @@ handle_info({tcp, _Socket, <<"SEND", Message/binary>>},
     {noreply, State};
 handle_info({tcp, _Socket, <<"COUNT\n">>}, 
             State=#{socket := Socket, transport := Transport, register := Register}) ->
-    Count = Register:count(),
-    BinaryCount = list_to_binary(integer_to_list(Count)),
-    ok = Transport:send(Socket, [BinaryCount, <<"\n">>]),
+    Count = integer_to_binary(Register:count()),
+    ok = Transport:send(Socket, [Count, <<"\n">>]),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 handle_info({tcp, _Socket, _Data}, 
