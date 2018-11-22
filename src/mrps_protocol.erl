@@ -29,7 +29,10 @@ loop(Socket, Transport, Register) ->
             Count = integer_to_binary(Register:count()),
             Transport:send(Socket, [Count, <<"\n">>]),
             ok = Transport:setopts(Socket, [{active, once}]),
-            loop(Socket, Transport, Register);            
+            loop(Socket, Transport, Register);
+        {tcp, Socket, _Data} ->
+            ok = Transport:setopts(Socket, [{active, once}]),
+            loop(Socket, Transport, Register);           
         {tcp_closed, Socket} ->
             close(Socket, Transport, Register);
         {tcp_closed, Socket, _Reason} ->
