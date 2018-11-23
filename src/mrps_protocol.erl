@@ -30,6 +30,10 @@ loop(Socket, Transport, Register) ->
             Transport:send(Socket, [Count, <<"\n">>]),
             ok = Transport:setopts(Socket, [{active, once}]),
             loop(Socket, Transport, Register);
+        {tcp, Socket, <<"PING\n">>} ->
+            Transport:send(Socket, <<"PONG\n">>),
+            ok = Transport:setopts(Socket, [{active, once}]),
+            loop(Socket, Transport, Register);
         {tcp, Socket, _Data} ->
             ok = Transport:setopts(Socket, [{active, once}]),
             loop(Socket, Transport, Register);           

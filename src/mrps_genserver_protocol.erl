@@ -36,6 +36,11 @@ handle_info({tcp, _Socket, <<"SEND", Message/binary>>},
     Register:for_each(send_msg(Message, self())),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
+handle_info({tcp, _Socket, <<"PING\n">>}, 
+            State=#{socket := Socket, transport := Transport}) ->
+    ok = Transport:send(Socket, <<"PONG\n">>),    
+    ok = Transport:setopts(Socket, [{active, once}]),
+    {noreply, State};
 handle_info({tcp, _Socket, <<"COUNT\n">>}, 
             State=#{socket := Socket, transport := Transport, register := Register}) ->
     Count = integer_to_binary(Register:count()),
