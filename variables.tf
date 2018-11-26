@@ -4,15 +4,17 @@ variable "region" {
   default = "par1"
 }
 
+variable "ssh_key" {}
+
 // Number of clients to create
 variable "count" {
   default = 1
 }
 
 output "server_ip" {
-  value = "${scaleway_server.server.public_ip}"
+  value = "${scaleway_ip.server_ip.ip}"
 }
 
 output "client_ips" {
-  value = "value"
+  value = "${formatlist("%v", scaleway_ip.client_ips.*.ip)}"
 }
