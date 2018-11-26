@@ -6,4 +6,5 @@ git clone git@github.com:lambdaclass/million_requests_per_second.git
 
 # https://github.com/processone/tsung/issues/276
 ln -s /usr/share /usr/lib/share
-ln -s /usr/lib/x86_64-linux-gnu/tsung /usr/lib/tsung
+# TODO: Change dir depending on architecture
+ln -s /usr/lib/arm-linux-gnueabihf/tsung /usr/lib/tsung
