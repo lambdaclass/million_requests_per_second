@@ -4,6 +4,8 @@
 
 -export([start_link/4, init/4]).
 
+-define(VERSION, "0.1").
+
 start_link(ListenerPid, Socket, Transport, [Register]) ->
     Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport, Register]),
     {ok, Pid}.
@@ -11,32 +13,40 @@ start_link(ListenerPid, Socket, Transport, [Register]) ->
 init(ListenerPid, _Socket, Transport, Register) ->
     {ok, Socket} = ranch:handshake(ListenerPid),
     Register:store_client(self()),
-    ok = Transport:setopts(Socket, [{nodelay, true}, {active, once}]),
 
-    Transport:send(Socket, <<"connected\n">>),
-    loop(Socket, Transport, Register).
+    case handshake(Socket, Transport) of
+        ok -> loop(Socket, Transport, Register);
+        stop -> close(Socket, Transport, Register)
+    end.
 
 loop(Socket, Transport, Register) ->
+    ok = Transport:setopts(Socket, [{active, once}]),
     receive
         {msg, Message} ->
             Transport:send(Socket, Message),
             loop(Socket, Transport, Register);
         {tcp, Socket, <<"SEND", Message/binary>>} ->
             Register:for_each(send_msg(Message, self())),
-            ok = Transport:setopts(Socket, [{active, once}]),
             loop(Socket, Transport, Register);
         {tcp, Socket, <<"COUNT\n">>} ->
             Count = integer_to_binary(Register:count()),
             Transport:send(Socket, [Count, <<"\n">>]),
-            ok = Transport:setopts(Socket, [{active, once}]),
             loop(Socket, Transport, Register);
         {tcp, Socket, _Data} ->
-            ok = Transport:setopts(Socket, [{active, once}]),
             loop(Socket, Transport, Register);           
         {tcp_closed, Socket} ->
             close(Socket, Transport, Register);
         {tcp_closed, Socket, _Reason} ->
             close(Socket, Transport, Register)
+	end.
+
+handshake(Socket, Transport) ->
+	Transport:send(Socket, ["MPRS server ", ?VERSION, $\n]),
+	case Transport:recv(Socket, 0, 5000) of
+		{ok, <<"CONNECT\n">>} ->
+			Transport:send(Socket, <<"CONNECTED\n">>),
+            ok;
+		_ -> stop
 	end.
 
 send_msg(Message, Sender) ->
