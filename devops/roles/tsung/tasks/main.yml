@@ -1,0 +1,14 @@
+---
+
+- name: install tsung
+  apt: name=tsung state=latest
+
+# https://github.com/processone/tsung/issues/276
+- name: create symlinks
+  file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+  with_items:
+    - { src: '/usr/share', dest: '/usr/lib/share' }
+    - { src: '/usr/lib/arm-linux-gnueabihf/tsung', dest: '/usr/lib/tsung' }

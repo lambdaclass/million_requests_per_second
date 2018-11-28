@@ -1,0 +1,17 @@
+---
+- hosts: mrps
+  remote_user: root
+  roles:
+    - git
+    - erlang
+  tasks:
+    - name: clone mrps repo
+      git:
+        repo: https://github.com/lambdaclass/million_requests_per_second.git
+        dest: million_requests_per_second
+        force: yes
+    
+- hosts: clients
+  remote_user: root
+  roles:
+    - tsung
