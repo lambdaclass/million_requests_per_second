@@ -18,3 +18,7 @@ output "server_ip" {
 output "client_ips" {
   value = "${formatlist("%v", scaleway_ip.client_ips.*.ip)}"
 }
+
+output "monitor_ip" {
+  value = "${scaleway_ip.monitor_ip.ip}"
+}

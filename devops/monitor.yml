@@ -1,0 +1,85 @@
+---
+- name: Provision monitoring system
+  hosts: monitor
+  remote_user: root
+
+  roles:
+    - role: nginx
+
+    - role: prometheus
+      prometheus_platform_architecture: linux-armv7
+      prometheus_web__external_url: 'http://localhost/prometheus'
+      prometheus_web__route_prefix: /
+      prometheus_rules:
+        - name: server_alerts
+          rules:
+          - alert: ServerDown
+            expr: up{job="mrps"} == 0
+            for: "1m"
+            annotations:
+              summary: "Server is down."
+              description: "Server [[ $labels.instance ]] is down."
+          - alert: CPUThresholdExeeded
+            expr: (100 * (1 - avg by(instance)(irate(node_cpu{job='mrps',mode='idle'}[5m])))) > 80
+            for: "1m"
+            annotations:
+              summary: "Instance [[ $labels.instance ]] CPU usage is avobe 80%"
+              description: "This device's cpu usage has exceeded the threshold with a value of [[ $value ]]."
+        - name: erlang_vm_alerts
+          rules:
+          - alert: ServerBEAMDown
+            expr: up{job="mrps", group="server_vm"} == 0
+            for: "1m"
+            annotations:
+              summary: "Server BEAM is down."
+              description: "[[ $labels.instance ]]'s Erlang VM is down."
+          - alert: ClientBEAMDown
+            expr: up{job="mrps", group="clients_vm"} == 0
+            for: "1m"
+            annotations:
+              summary: "Client BEAM is down."
+              description: "[[ $labels.instance ]]'s Erlang VM is down."
+  
+  tasks:
+    - name: Configure Prometheus
+      block:
+        - name: copy prometheus config
+          template:
+            src: templates/prometheus.yml.j2
+            dest: "/etc/prometheus/prometheus.yml"
+            owner: "prometheus"
+            group: "prometheus"
+        - name: (htpasswd module dependency) install python-passlib
+          apt:
+            name: python-passlib
+        - name: add prometheus user/passwd to nginx
+          htpasswd:
+            path: /etc/nginx/.htpasswd
+            username: "{{ prometheus_web_user }}"
+            password: "{{ prometheus_web_passwd }}"
+            owner: www-data
+        - name: copy prometheus server block
+          copy:
+            src: files/prometheus.server
+            dest: /etc/nginx/sites-available/prometheus
+            owner: www-data
+        - name: enable prometheus server block
+          file:
+            src: /etc/nginx/sites-available/prometheus
+            dest: /etc/nginx/sites-enabled/prometheus
+            state: link
+            owner: www-data
+        - name: remove default nginx site 
+          file:
+            state: absent
+            path: /etc/nginx/sites-enabled/default
+        - name: "reload nginx"
+          service:
+            name: nginx
+            state: reloaded
+      vars:
+        server: "{{ groups['server'][0] }}"
+        clients: "{{ groups['clients'] }}"
+        prometheus_web_user: admin
+        prometheus_web_passwd: mrpssprm
+      tags: prometheus-config

@@ -1,0 +1,5 @@
+---
+- name: "(Install: SUSE) Add NGINX Repository"
+  zypper_repository:
+    name: nginx
+    repo: "{{ nginx_repository.suse }}"

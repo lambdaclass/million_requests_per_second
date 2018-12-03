@@ -1,4 +1,0 @@
----
-
-- name: clone repo
-  command: git clone {{ repo_url }}
