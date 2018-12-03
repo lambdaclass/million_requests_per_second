@@ -8,6 +8,7 @@
   file:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
+    follow: no
     state: link
   with_items:
     - { src: '/usr/share', dest: '/usr/lib/share' }

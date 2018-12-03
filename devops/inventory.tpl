@@ -7,3 +7,6 @@ ${client_ips}
 [mrps:children]
 server
 clients
+
+[monitor]
+${monitor_ip}
