@@ -3,13 +3,29 @@
   hosts: monitor
   remote_user: root
 
-  roles:
+  roles:  
     - role: nginx
+
+    - role: grafana
+      grafana_security:
+        admin_user: "{{ grafana_admin_user }}"
+        admin_password: "{{ grafana_admin_passwd }}"
+      grafana_datasources:
+      - name: prometheus
+        type: prometheus
+        access: proxy
+        url: 'http://localhost:9090'
+        basicAuth: False
+      grafana_dashboards:
+      - dashboard_id: 8919
+        revision_id: 5
+        datasource: prometheus
+      vars:
+        grafana_admin_user: admin
+        grafana_admin_passwd: mrpssprm
 
     - role: prometheus
       prometheus_platform_architecture: linux-armv7
-      prometheus_web__external_url: 'http://localhost/prometheus'
-      prometheus_web__route_prefix: /
       prometheus_rules:
         - name: server_alerts
           rules:
@@ -49,6 +65,7 @@
             dest: "/etc/prometheus/prometheus.yml"
             owner: "prometheus"
             group: "prometheus"
+          notify: restart prometheus
         - name: (htpasswd module dependency) install python-passlib
           apt:
             name: python-passlib
@@ -73,13 +90,38 @@
           file:
             state: absent
             path: /etc/nginx/sites-enabled/default
-        - name: "reload nginx"
-          service:
-            name: nginx
-            state: reloaded
+          notify: reload nginx
+
       vars:
         server: "{{ groups['server'][0] }}"
         clients: "{{ groups['clients'] }}"
         prometheus_web_user: admin
         prometheus_web_passwd: mrpssprm
       tags: prometheus-config
+
+    - name: configure grafana
+      block:
+        - name: copy grafana server block
+          copy:
+            src: files/grafana.server
+            dest: /etc/nginx/sites-available/grafana
+            owner: www-data
+        - name: enable grafana server block
+          file:
+            src: /etc/nginx/sites-available/grafana
+            dest: /etc/nginx/sites-enabled/grafana
+            state: link
+            owner: www-data
+          notify: reload nginx
+
+  handlers:
+    - name: restart prometheus
+      service: 
+        name: prometheus
+        state: restarted
+        enabled: yes
+    
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
