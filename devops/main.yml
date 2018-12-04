@@ -34,5 +34,5 @@
         server: "{{ groups['server'][0] }}"
 
 
-# - name: Setup monitoring system
-#   import_playbook: monitor.yml
+- name: Setup monitoring system
+  import_playbook: monitor.yml
