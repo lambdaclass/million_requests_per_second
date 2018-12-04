@@ -1,0 +1,34 @@
+---
+- name: Install dependencies
+  package:
+    name: "{{ grafana_dependencies }}"
+    state: present
+  register: _install_dep_packages
+  until: _install_dep_packages is succeeded
+  retries: 5
+  delay: 2
+
+- name: Remove conflicting grafana packages
+  package:
+    name: grafana-data
+    state: absent
+  register: _old_grafana_pkgs
+
+- name: Clean apt cache
+  command: apt clean
+  when:
+    - _old_grafana_pkgs is changed
+    - ansible_pkg_mgr == "apt"
+
+- name: Add Grafana repository file [RHEL/CentOS]
+  template:
+    src: grafana.yum.repo.j2
+    dest: /etc/yum.repos.d/grafana.repo
+    force: true
+    backup: true
+  when: ansible_pkg_mgr in ['yum', 'dnf']
+
+- name: Install Grafana
+  apt:
+    deb: https://dl.grafana.com/oss/release/grafana_5.4.0_armhf.deb
+  notify: restart grafana
