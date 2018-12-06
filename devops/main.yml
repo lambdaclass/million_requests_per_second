@@ -1,9 +1,9 @@
 ---
+
 - name: Provision MRPS server and clients
   hosts: mrps
   remote_user: root
   roles:
-    - role: git
     - role: erlang
     - role: prometheus
       prometheus_platform_architecture: linux-armv7
@@ -11,25 +11,41 @@
       prometheus_node_exporter_install: true
       prometheus_alert_manager_install: false
 
-  tasks:
-    - name: clone mrps repo
-      git:
-        repo: https://github.com/lambdaclass/million_requests_per_second.git
-        dest: million_requests_per_second
-        force: yes
+
+- name: Install MRPS release
+  hosts: server
+  remote_user: root
+
+  roles:
+  - role: git
+  - role: mrps
+  tags: install-release
 
 
 - name: Install Tsung on clients
   hosts: clients
   remote_user: root
-  roles:
-    - tsung
-
   tasks:
-    - name: copy prometheus config
+    - name: install tsung
+      apt: 
+        name: tsung
+        state: latest
+
+    # https://github.com/processone/tsung/issues/276
+    - name: create symlinks
+      file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        follow: no
+        state: link
+      with_items:
+        - { src: '/usr/share', dest: '/usr/lib/share' }
+        - { src: '/usr/lib/arm-linux-gnueabihf/tsung', dest: '/usr/lib/tsung' }
+
+    - name: copy tsung spec
       template:
         src: templates/tsung.xml.j2
-        dest: "~/million_requests_per_second/tsung.xml"
+        dest: "~/client/tsung.xml"
       vars:
         server: "{{ groups['server'][0] }}"
 
