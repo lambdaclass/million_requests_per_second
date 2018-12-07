@@ -11,6 +11,21 @@
       prometheus_node_exporter_install: true
       prometheus_alert_manager_install: false
 
+  tasks:
+    - name: increase file descriptor and number of threads limits
+      pam_limits:
+        domain: root
+        limit_type: "{{ item.limit_type }}"
+        limit_item: "{{ item.limit_item }}"
+        value: "{{ item.value }}"
+      loop:
+        - { limit_type: '-', limit_item: 'nofile', value: 65536 }
+        - { limit_type: '-', limit_item: 'nproc', value: 65536 }
+        - { limit_type: 'soft', limit_item: 'memlock', value: unlimited }
+        - { limit_type: 'hard', limit_item: 'memlock', value: unlimited }
+    - name: reload settings from all system configuration files
+      shell: sysctl --system
+  tags: provision-hosts
 
 - name: Install MRPS release
   hosts: server
@@ -42,13 +57,11 @@
         - { src: '/usr/share', dest: '/usr/lib/share' }
         - { src: '/usr/lib/arm-linux-gnueabihf/tsung', dest: '/usr/lib/tsung' }
 
-    - name: copy tsung spec
-      template:
-        src: templates/tsung.xml.j2
-        dest: "~/client/tsung.xml"
-      vars:
-        server: "{{ groups['server'][0] }}"
-
+    - name: create tsung dir
+      file:
+        path: tsung
+        state: directory
+  tags: setup-clients
 
 - name: Setup monitoring system
   import_playbook: monitor.yml
