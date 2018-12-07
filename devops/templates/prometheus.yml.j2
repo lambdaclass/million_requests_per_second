@@ -1,0 +1,37 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 30s
+  external_labels:
+    monitor: 'mrps-monitor'
+    
+rule_files:
+  - '/etc/prometheus/rules/*.rules.yml'
+  
+scrape_configs: 
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+        - 'localhost:9090' # Prometheus
+        - 'localhost:9100' # Node_exporter
+  - job_name: 'mrps'
+    static_configs:
+      - labels: 
+          group: 'server'
+        targets: 
+          - '{{ server }}:9100'
+      - labels:
+          group: 'server-vm'
+        targets:
+          - '{{ server }}:9101'
+      - labels:
+          group: 'clients'
+        targets:
+{% for client in clients %}
+          - '{{ client }}:9100'
+{% endfor %}
+      - labels:
+          group: 'clients-vm'
+        targets:
+{% for client in clients %}
+          - '{{ client }}:9101'
+{% endfor %}

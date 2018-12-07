@@ -1,0 +1,7 @@
+---
+
+erlang_repo_package_url: https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb
+tmp_dir: /tmp
+erlang_repo_package_path: "{{ tmp_dir }}/{{ erlang_repo_package_url | basename }}"
+
+erlang_extra_packages: []

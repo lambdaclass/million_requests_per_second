@@ -1,0 +1,16 @@
+---
+
+- name: Get Erlang packages deb
+  get_url: url={{ erlang_repo_package_url }} dest={{ erlang_repo_package_path }}
+
+- name: Install Erlang packages
+  command: dpkg -i {{ erlang_repo_package_path }}
+
+- name: Cleanup installer
+  file: path={{ erlang_repo_package_path }} state=absent
+
+- name: Update cache
+  apt: update_cache=yes
+
+- name: Install erlang package
+  apt: name=esl-erlang state=present
