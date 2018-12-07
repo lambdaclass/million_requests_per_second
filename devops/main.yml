@@ -1,9 +1,9 @@
 ---
+
 - name: Provision MRPS server and clients
   hosts: mrps
   remote_user: root
   roles:
-    - role: git
     - role: erlang
     - role: prometheus
       prometheus_platform_architecture: linux-armv7
@@ -12,27 +12,56 @@
       prometheus_alert_manager_install: false
 
   tasks:
-    - name: clone mrps repo
-      git:
-        repo: https://github.com/lambdaclass/million_requests_per_second.git
-        dest: million_requests_per_second
-        force: yes
+    - name: increase file descriptor and number of threads limits
+      pam_limits:
+        domain: root
+        limit_type: "{{ item.limit_type }}"
+        limit_item: "{{ item.limit_item }}"
+        value: "{{ item.value }}"
+      loop:
+        - { limit_type: '-', limit_item: 'nofile', value: 65536 }
+        - { limit_type: '-', limit_item: 'nproc', value: 65536 }
+        - { limit_type: 'soft', limit_item: 'memlock', value: unlimited }
+        - { limit_type: 'hard', limit_item: 'memlock', value: unlimited }
+    - name: reload settings from all system configuration files
+      shell: sysctl --system
+  tags: provision-hosts
+
+- name: Install MRPS release
+  hosts: server
+  remote_user: root
+
+  roles:
+  - role: git
+  - role: mrps
+  tags: install-release
 
 
 - name: Install Tsung on clients
   hosts: clients
   remote_user: root
-  roles:
-    - tsung
-
   tasks:
-    - name: copy prometheus config
-      template:
-        src: templates/tsung.xml.j2
-        dest: "~/million_requests_per_second/tsung.xml"
-      vars:
-        server: "{{ groups['server'][0] }}"
+    - name: install tsung
+      apt: 
+        name: tsung
+        state: latest
 
+    # https://github.com/processone/tsung/issues/276
+    - name: create symlinks
+      file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        follow: no
+        state: link
+      with_items:
+        - { src: '/usr/share', dest: '/usr/lib/share' }
+        - { src: '/usr/lib/arm-linux-gnueabihf/tsung', dest: '/usr/lib/tsung' }
+
+    - name: create tsung dir
+      file:
+        path: tsung
+        state: directory
+  tags: setup-clients
 
 - name: Setup monitoring system
   import_playbook: monitor.yml

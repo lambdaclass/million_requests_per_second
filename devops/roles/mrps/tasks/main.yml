@@ -1,0 +1,45 @@
+---
+
+- name: clone mrps repo
+  git:
+    repo: https://github.com/lambdaclass/million_requests_per_second.git
+    dest: million_requests_per_second
+    # force: yes
+
+- name: create sys.config
+  template:
+    src: templates/sys.config.j2
+    dest: million_requests_per_second/sys.config
+
+- name: build release
+  command: ./rebar3 as prod release tar
+  args:
+    chdir: million_requests_per_second
+
+- name: check if release is present
+  stat:
+    path: "{{ install_path }}"
+  register: release
+
+- name: remove old release
+  block:
+  - name: stop running server
+    command: ./mrps stop
+    args:
+      chdir: "{{ install_path }}/bin"
+    ignore_errors: yes
+  - name: remove files
+    file:
+      path: "{{ install_path }}/"
+      state: absent
+  when: release.stat.exists and release.stat.isdir
+
+- name: create dir
+  file:
+    path: "{{ install_path }}"
+    state: directory
+
+- name: unarchive release in server
+  command: "tar -xzf million_requests_per_second/_build/prod/rel/mrps/mrps-1.tar.gz -C {{ install_path }}"
+  args: 
+    warn: False

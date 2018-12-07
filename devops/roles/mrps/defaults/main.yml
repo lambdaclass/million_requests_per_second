@@ -1,0 +1,6 @@
+---
+
+install_path: /root/mrps
+prometheus_user: "admin"
+prometheus_passwd: "mrpssprm"
+prometheus_port: 9001

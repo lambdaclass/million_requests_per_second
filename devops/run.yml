@@ -1,0 +1,33 @@
+---
+
+- name: Starts MRPS server
+  hosts: server
+  remote_user: root
+  tags: "start-server"
+  tasks:
+    - name: start server
+      command: "{{ install_path }}/bin/mrps start"
+      vars:
+        install_path: /root/mrps
+
+
+- name: Start Tsung clients
+  hosts: clients
+  remote_user: root
+  tags: "load-test"
+  tasks:
+    - name: copy tsung spec
+      template:
+        src: templates/tsung.xml.j2
+        dest: tsung/tsung.xml
+      vars:
+        server: "{{ groups['server'][0] }}"
+    
+    - name: begin load test
+      command: tsung -f tsung.xml start
+      args:
+        chdir: tsung
+      register: output
+    - debug:
+        var: output.stdout_lines
+
