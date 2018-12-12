@@ -12,6 +12,20 @@
       prometheus_alert_manager_install: false
 
   tasks:
+    - name: change sysctl limits
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+      loop:
+        - { name: 'fs.file-max', value: 12000500}
+        - { name: 'fs.nr_open', value: 20000500}
+        - { name: 'net.ipv4.tcp_mem', value: '10000000 10000000 10000000'}
+        - { name: 'net.ipv4.tcp_rmem', value: '1024 4096 16384'}
+        - { name: 'net.ipv4.tcp_wmem', value: '1024 4096 16384'}
+        - { name: 'net.ipv4.tcp_wmem', value: '1024 4096 16384'}
+        - { name: 'net.core.rmem_max', value: 16384}
+        - { name: 'net.core.wmem_max', value: 16384}
+
     - name: increase file descriptor and number of threads limits
       pam_limits:
         domain: root
@@ -19,8 +33,8 @@
         limit_item: "{{ item.limit_item }}"
         value: "{{ item.value }}"
       loop:
-        - { limit_type: '-', limit_item: 'nofile', value: 65536 }
-        - { limit_type: '-', limit_item: 'nproc', value: 65536 }
+        - { limit_type: '-', limit_item: 'nofile', value: 2000000 }
+        - { limit_type: '-', limit_item: 'nproc', value: 2000000 }
         - { limit_type: 'soft', limit_item: 'memlock', value: unlimited }
         - { limit_type: 'hard', limit_item: 'memlock', value: unlimited }
     - name: reload settings from all system configuration files
