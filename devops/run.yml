@@ -23,6 +23,10 @@
       vars:
         server: "{{ groups['server'][0] }}"
     
+    - name: stop tsung (if already running)
+      command: tsung stop
+      ignore_errors: yes
+      
     - name: begin load test
       command: tsung -f tsung.xml start
       args:

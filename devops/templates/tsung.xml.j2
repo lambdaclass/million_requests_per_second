@@ -2,27 +2,28 @@
 <!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
 <tsung version="1.0">
     <clients>
-        <client host="localhost" use_controller_vm="true" maxusers="10000" />
+        <client host="localhost" use_controller_vm="true" maxusers="20000" />
     </clients>
 
     <servers>
         <server host="{{ server }}" port="6969" type="tcp" />
     </servers>
 
-    <load>
-        <arrivalphase phase="1" duration="100" unit="second">
-            <users maxnumber="10000" arrivalrate="1000" unit="second" />
-        </arrivalphase>
+    <load duration="5" unit="minute">
+        <arrivalphase phase="1" duration="5" unit="minute">
+        	<users maxnumber="20000" arrivalrate="300" unit="second" />
+    	</arrivalphase>
     </load>
 
     <options>
-        <option name="ports_range" min="1025" max="65535"/>
-        <option name="global_number" value ="10000"/>
+	    <option name="ports_range" min="1025" max="65535"/>
     </options>
 
     <sessions>
-        <session probability="100" name="raw" type="ts_raw">
-            <thinktime value="wait_global"></thinktime>
-        </session>
+	    <session probability="100" name="raw" type="ts_raw">
+            <request>
+                <raw data="COUNT" ack="local"></raw>
+            </request>
+	    </session>
     </sessions>
 </tsung>
