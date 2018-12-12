@@ -23,15 +23,18 @@ loop(Socket, Transport, Register) ->
     ok = Transport:setopts(Socket, [{active, once}]),
     receive
         {msg, Message} ->
-            Transport:send(Socket, Message),
+            Transport:send(Socket, ["Received message:\n", Message]),
             loop(Socket, Transport, Register);
         {tcp, Socket, <<"SEND", Message/binary>>} ->
             Register:for_each(send_msg(Message, self())),
+            Transport:send(Socket, <<"Message sent\n">>),
             loop(Socket, Transport, Register);
         {tcp, Socket, <<"COUNT\n">>} ->
             Count = integer_to_binary(Register:count()),
             Transport:send(Socket, [Count, <<"\n">>]),
             loop(Socket, Transport, Register);
+        {tcp, Socket, <<"EXIT\n">>} ->
+            close(Socket, Transport, Register);
         {tcp, Socket, _Data} ->
             loop(Socket, Transport, Register);           
         {tcp_closed, Socket} ->
@@ -41,10 +44,10 @@ loop(Socket, Transport, Register) ->
 	end.
 
 handshake(Socket, Transport) ->
-	Transport:send(Socket, ["MPRS server ", ?VERSION, $\n]),
+	Transport:send(Socket, ["MRPS server ", ?VERSION, $\n]),
 	case Transport:recv(Socket, 0, 5000) of
 		{ok, <<"CONNECT\n">>} ->
-			Transport:send(Socket, <<"CONNECTED\n">>),
+			Transport:send(Socket, <<"Connected\n">>),
             ok;
 		_ -> stop
 	end.
