@@ -13,11 +13,8 @@ start_link(ListenerPid, Socket, Transport, [Register]) ->
 init(ListenerPid, _Socket, Transport, Register) ->
     {ok, Socket} = ranch:handshake(ListenerPid),
     Register:store_client(self()),
-
-    case handshake(Socket, Transport) of
-        ok -> loop(Socket, Transport, Register);
-        stop -> close(Socket, Transport, Register)
-    end.
+    Transport:send(Socket, ["MRPS server ", ?VERSION, $\n]),
+    loop(Socket, Transport, Register).
 
 loop(Socket, Transport, Register) ->
     ok = Transport:setopts(Socket, [{active, once}]),
@@ -41,15 +38,6 @@ loop(Socket, Transport, Register) ->
             close(Socket, Transport, Register);
         {tcp_closed, Socket, _Reason} ->
             close(Socket, Transport, Register)
-	end.
-
-handshake(Socket, Transport) ->
-	Transport:send(Socket, ["MRPS server ", ?VERSION, $\n]),
-	case Transport:recv(Socket, 0, 5000) of
-		{ok, <<"CONNECT\n">>} ->
-			Transport:send(Socket, <<"Connected\n">>),
-            ok;
-		_ -> stop
 	end.
 
 send_msg(Message, Sender) ->
