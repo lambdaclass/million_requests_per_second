@@ -17,8 +17,8 @@
         url: 'http://localhost:9090'
         basicAuth: False
       grafana_dashboards:
-      - dashboard_id: 8919
-        revision_id: 5
+      - dashboard_id: 1860
+        revision_id: 12
         datasource: prometheus
       vars:
         grafana_admin_user: admin
