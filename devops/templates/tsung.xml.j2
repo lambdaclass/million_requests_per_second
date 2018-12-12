@@ -22,7 +22,16 @@
     <sessions>
 	    <session probability="100" name="raw" type="ts_raw">
             <request>
-                <raw data="COUNT" ack="local"></raw>
+                <raw data="COUNT\n" ack="local"></raw>
+            </request>
+            <for var="i" from="1" to="300" incr="1">
+                <thinktime value="1" random="true" />
+                <request>
+                    <raw data="COUNT\n" ack="local"></raw>
+                </request>
+            </for>
+            <request>
+                <raw data="EXIT\n" ack="local"></raw>
             </request>
 	    </session>
     </sessions>
