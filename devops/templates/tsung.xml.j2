@@ -2,16 +2,16 @@
 <!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
 <tsung version="1.0">
     <clients>
-        <client host="localhost" use_controller_vm="true" maxusers="20000" />
+        <client host="localhost" use_controller_vm="true" maxusers="80000" />
     </clients>
 
     <servers>
         <server host="{{ server }}" port="6969" type="tcp" />
     </servers>
 
-    <load duration="5" unit="minute">
-        <arrivalphase phase="1" duration="5" unit="minute">
-        	<users maxnumber="20000" arrivalrate="300" unit="second" />
+    <load duration="10" unit="minute">
+        <arrivalphase phase="1" duration="10" unit="minute">
+        	<users maxnumber="80000" arrivalrate="500" unit="second" />
     	</arrivalphase>
     </load>
 
@@ -20,19 +20,17 @@
     </options>
 
     <sessions>
-	    <session probability="100" name="raw" type="ts_raw">
+	    <session probability="100" name="counters" type="ts_raw">
             <request>
-                <raw data="COUNT\n" ack="local"></raw>
+                <raw data="COUNT&#10;" ack="local"></raw>
             </request>
-            <for var="i" from="1" to="300" incr="1">
-                <thinktime value="1" random="true" />
+
+            <for var="i" from="1" to="30" incr="1">
+                <thinktime value="50" />
                 <request>
-                    <raw data="COUNT\n" ack="local"></raw>
-                </request>
+                    <raw data="COUNT&#10;" ack="local"></raw>
+                </request>            
             </for>
-            <request>
-                <raw data="EXIT\n" ack="local"></raw>
-            </request>
 	    </session>
     </sessions>
 </tsung>
