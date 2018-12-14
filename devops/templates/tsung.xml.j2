@@ -9,10 +9,11 @@
         <server host="{{ server }}" port="6969" type="tcp" />
     </servers>
 
-    <load duration="10" unit="minute">
+    <load>
         <arrivalphase phase="1" duration="10" unit="minute">
-        	<users maxnumber="80000" arrivalrate="500" unit="second" />
+        	<users maxnumber="60000" arrivalrate="500" unit="second" />
     	</arrivalphase>
+        <user session="send_msg" start_time="60" unit="second"></user>
     </load>
 
     <options>
@@ -32,5 +33,13 @@
                 </request>            
             </for>
 	    </session>
+        <session probability="0" name="send_msg" type="ts_raw">
+            <for var="i" from="1" to="120" incr="1">
+                <thinktime value="5" />
+                <request>
+                    <raw data="SENDFOO&#10;" ack="local"></raw>
+                </request>
+            </for>
+        </session>
     </sessions>
 </tsung>
