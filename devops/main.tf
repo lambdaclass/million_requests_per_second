@@ -44,7 +44,7 @@ resource "scaleway_server" "monitor" {
 }
 
 data "template_file" "ansible_inventory_tpl" {
-  template = "${file("inventory.tpl")}"
+  template = "${file("devops/inventory.tpl")}"
 
   vars {
     server_ip   = "${scaleway_ip.server_ip.ip}"
