@@ -1,7 +1,23 @@
-mrps
+Million Requests per Second
 =====
 
-An OTP application
+In this project we set up a server that accepts connections from a number of clients, and relays the messages each one sends to the rest of the connected clients.
+
+
+### Server
+
+- Handles client subscribe/unsubscribe. 
+- Broadcasts messages received from one client to the rest.  
+
+
+### Client
+
+- Sends a message to the server every `N` seconds.
+- Receives messages from the server (originally sent by another client).
+
+### Protocol
+
+TODO
 
 Build
 -----
