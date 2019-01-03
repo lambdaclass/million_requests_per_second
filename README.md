@@ -1,8 +1,16 @@
 # Million Requests per Second
 
+> _Load-testing Erlang servers for fun ~~and profit~~_
+
 With this project you'll be able to set up, with minor effort, an Erlang TCP server, any number of clients connecting to it, and monitor everything as it happens. This way you can introduce bottlenecks, bugs, or any other issue you want into the server and teach how to analyze the metrics/logs, debug, and resolve the issue.
 
-## The Specification
+1. [Specification](#1-specification)
+2. [Requirements](#2-requirements)
+3. [Setup](#3-setup)
+4. [Usage](#4-usage)
+5. [History](#5-history)
+
+## 1. Specification
 
 ### Server
 
@@ -19,6 +27,7 @@ With this project you'll be able to set up, with minor effort, an Erlang TCP ser
 
 - Monitoring of clients
 - Monitoring of server
+- Serve dashboard to visualize metrics
 
 ### Server-Client Interaction
 
@@ -31,13 +40,15 @@ Messages a client can send:
 - `COUNT`: the server responds with the amount of connected clients
 - `EXIT`: Closes the connection to the server
 
-## Requirements
+![Supervision tree](architechture.svg)
+
+## 2. Requirements
 
 - [Terraform 0.11.11](https://www.terraform.io/downloads.html)
 - [Ansible 2.7.5](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installation-guide)
 - Scaleway account (this can be changed to any other provider in Terraform configuration)
 
-## Setup
+## 3. Setup
 
 Set the following environment variables:
 
@@ -49,7 +60,7 @@ Set the following environment variables:
 
 If you are using (or want) a different provider please check their corresponding documentation on how to setup for it at [Terraform Providers](https://www.terraform.io/docs/providers/index.html).
 
-## Usage
+## 4. Usage
 
 ### Creating the infrastructure
 
@@ -97,3 +108,248 @@ $> make run
 ```
 
 This will run Tsung using [its configuration](devops/templates/tsung.xml.j2).
+
+
+## 5. History
+
+- [First steps](#first-steps)
+- [Registering clients](#registering-clients)
+- [Orchestration and Provisioning](#orchestration-and-provisioning)
+- [Monitoring](#monitoring)
+- [Load testing](#load-testing)
+
+One of the core strengths of the Erlang programming language, more specifically of the Erlang/OTP runtime system, is its support for concurrency and distribution, making it ideally suited for soft real-time, high-availablity applications.  
+Inspired by [this post](https://phoenixframework.org/blog/the-road-to-2-million-websocket-connections) from the [Phoenix](https://phoenixframework.org) team, we decided to build a TCP server to try our hand at the [C10k problem](https://en.wikipedia.org/wiki/C10k_problem), namely to serve and maintain as many connections as possible on commodity hardware. This is our journal of the project.  
+
+
+### First steps
+
+To build our server we could have rolled our own socket pool using OTP's `gen_tcp` behaviour, but we chose to use [Ranch](https://github.com/ninenines/ranch), a minimal, low latency library from the creator of [Cowboy](https://github.com/ninenines/cowboy).  
+Once the `Ranch` application is started, we can start listening for connections:
+
+```erlang
+start(_StartType, _StartArgs) ->
+    ranch:start_listener(mrps, 10, ranch_tcp, 
+                         [{port, 6969}, {max_connections, infinity}],
+                         mrps_protocol, []),
+    mrps_sup:start_link().
+```
+
+Here we start `10` acceptor processes, that listen on TCP port `6969` for an unlimited number of connections. The `mrps_protocol` is our protocol handler, which defines the logic executed by each connection process.
+
+Our server supports some basic commands:
+- Accept incoming connections
+- Return count of connected clients
+- Broadcast messages received from one client to the rest
+- Close connection
+
+The core of the protocol implementation is a `loop` function that handles communication between client and server:
+
+```erlang
+loop(Socket, Transport, Register) ->
+    ok = Transport:setopts(Socket, [{active, once}]),
+    receive
+        {msg, Message} ->
+            Transport:send(Socket, ["Received message:\n", Message]),
+            loop(Socket, Transport, Register);
+        {tcp, Socket, <<"SEND", Message/binary>>} ->
+            Register:for_each(send_msg(Message, self())),
+            Transport:send(Socket, <<"Message sent\n">>),
+            loop(Socket, Transport, Register);
+        {tcp, Socket, <<"COUNT\n">>} ->
+            Count = integer_to_binary(Register:count()),
+            Transport:send(Socket, [Count, <<"\n">>]),
+            loop(Socket, Transport, Register);
+        {tcp, Socket, <<"EXIT\n">>} ->
+            close(Socket, Transport, Register);
+        {tcp, Socket, _Data} ->
+            loop(Socket, Transport, Register);           
+        {tcp_closed, Socket} ->
+            close(Socket, Transport, Register);
+        {tcp_closed, Socket, _Reason} ->
+            close(Socket, Transport, Register)
+	end.
+```
+
+The `Register` we use here is an abstraction (a [behaviour](http://erlang.org/doc/design_principles/des_princ.html#behaviours)) that maintains a list of connected clients and provides a way to iterate through them. Later, we discuss the different implementations we tried out.  
+Our server listens for the following commands:
+- `SEND<msg>` => Server sends `<msg>` to all the other clients connected. They receive the following: `Received message: <msg>`
+- `COUNT` => Server responds with the amount of connected clients
+- `EXIT` => Closes the connection to the server
+
+To broadcast the `<msg>` to the rest of the clients, we send a message to each connection process:
+
+```erlang
+Client ! {msg, Message}
+```
+
+The message is matched by the `loop` function, which then sends it to the client:
+
+```erlang
+{msg, Message} ->
+            Transport:send(Socket, ["Received message:\n", Message]),
+            loop(Socket, Transport, Register);
+```
+
+
+### Registering clients
+
+In order to broadcast messages our application needed a way to store all connected clients. We first created a behaviour that defined the following callbacks:
+
+```erlang
+behaviour_info(callbacks) ->
+    [{init, 1},
+     {store_client, 1},
+     {remove_client, 1},
+     {for_each, 1},
+     {count, 0}];
+```
+
+We tested out serveral alternatives.
+ 
+
+#### ETS
+
+A simple yet effective way to store global state comes built in the Erlang system. `Erlang Term Storage`, or [ets](http://erlang.org/doc/man/ets.html), is a module that provides dynamic tables that store tuples indexed by a key.  
+Nothing beats `ets` tables for simplicity:
+
+```erlang
+init(_Args) ->
+    ets:new(clients, [set, public, named_table]).
+
+store_client(Client) ->
+    ets:insert(clients, {Client}).
+
+remove_client(Client) ->
+    ets:delete(clients, Client).
+
+for_each(Func) ->
+    ets:foldl(
+        fun({Client}, _Acc) -> Func(Client) end, 
+        [],
+        clients  
+    ).
+
+count() ->
+    ets:info(clients, size).
+```
+
+Here the `init` callback returns a table named `clients` with `public` access, so that connection processes can register each client.  
+We tested out the different types of `ets` tables:
+- `set`: each key must be unique
+- `ordered_set`: keys are unique and are stored/accessed in order
+- `bag`: keys can repeat, but the tuples to store must be unique
+- `duplicate_bag`: keys can repeat and identical tuples can be stored
+
+We found no meaningful difference in performance between the tables, although its been [reported](https://github.com/phoenixframework/phoenix/pull/1311) that `duplicate_bag` (since it enforces less constraints) might offer some improvement.  
+The rest of the api is self-explanatory.
+
+
+#### PG2
+
+Erlang provides another solution in the [pg2](http://erlang.org/doc/man/pg2.html) module, which implements process groups. It handles distributed named process groups, where messages can be sent to one, some or all group members.  
+Clients are added to a global group, and then removed automatically when their connection process ends.
+
+#### Syn and Gproc
+
+These are two third-party libraries that provide a global process registry, with strong support for distribution and concurrent reads. They are well tested and maintained; perhaps a bit excessive for such a simple project. An extensive comparison of the different process registries can be found [here](http://www.ostinelli.net/an-evaluation-of-erlang-global-process-registries-meet-syn/).  
+The corresponding behaviour implementations are relatively straight forward.
+
+
+### Orchestration and provisioning
+
+One of our goals was to have a one-click solution for creating infrastructure, installing needed software and deploying code to run our server.  
+To this end, we used [Terraform](www.terraform.io) to create and manage the needed cloud resources, and [Ansible](https://www.ansible.com) as a provisioning and configuration management tool.
+
+#### Terraform
+
+From the official documentation:
+
+> Terraform is a tool for building, changing, and versioning infrastructure safely and efficiently. Terraform can manage existing and popular service providers as well as custom in-house solutions.
+
+As stated, it is a tool to create, manage and tear down cloud resources.
+It features a declarative syntax with which we describe the end state of our infrastructure, and the needed operations (creation, destruction, scaling) are handled automatically.
+
+For our project, we used [Scaleway](https://www.scaleway.com), a cloud provider that offers ARMv7 machines.  
+Here's how we create a server:
+
+```
+resource "scaleway_server" "server" {
+    name        = "load-server"
+    image       = "31dfef82-9b45-4b01-9656-031617f36599"
+    type        = "C1"
+    depends_on  = ["scaleway_ssh_key.ssh_key"]
+}
+```
+
+Since we wanted the ability to create clients dynamically, we can pass the number of clients as a parameter to Terraform:
+
+```bash
+$> terraform apply -var "count=5"
+```
+
+And here's how we create the client servers:
+
+```
+resource "scaleway_server" "clients" {
+    count       = "${var.count}"
+    name        = "load-client-${count.index}"
+    image       = "31dfef82-9b45-4b01-9656-031617f36599"
+    type        = "C1"
+    depends_on  = ["scaleway_server.server"]
+}
+```
+
+Terraform provides a way to output generated values (ips in our case) so we can use them with our provisioning tool. Here's how we populate Ansible's inventory:
+
+```
+data "template_file" "ansible_inventory_tpl" {
+  template = "${file("devops/inventory.tpl")}"
+
+  vars {
+    server_ip   = "${scaleway_ip.server_ip.ip}"
+    client_ips  = "${join("\n", scaleway_ip.client_ips.*.ip)}"
+    monitor_ip  = "${scaleway_ip.monitor_ip.ip}"
+  }
+}
+```
+
+#### Ansible
+
+Among the many alternatives in the field (Chef, Puppet, Salt) we chose Ansible, an agentless provisioning and configuration management tool that leverages Python and ssh.  
+The syntax is quite easy to grasp, consisting of `yaml` files ([playbooks](https://docs.ansible.com/ansible/latest/user_guide/playbooks.html)) and an inventory file that defines the hosts to provision/configure.  
+`Playbooks` are run against said hosts and take care of installing packages, creating users, configuring the system, etc.   
+Here's a task that installs [Tsung](http://tsung.erlang-projects.org/user_manual/) on clients:
+```yaml
+---  
+- name: Install Tsung on clients
+  hosts: clients
+  remote_user: root
+  tasks:
+    - name: install tsung
+      apt: 
+        name: tsung
+        state: latest
+```
+
+It is a comprehensive tool, allowing for a variety of system administration tasks that go above and beyond what we needed for this project.
+
+### Monitoring
+
+In order to gain insights from our tests, we also set up a monitoring system. In particular, we used [Prometheus](https://prometheus.io/), an open-source systems monitoring and alerting toolkit.  
+It consists of multiple components:
+- the main Prometheus server which scrapes and stores time series data
+- special-purpose exporters
+- an alertmanager
+- client libraries for instrumenting application code
+
+Each machine in our project collects metrics through the official [node_exporter](https://github.com/prometheus/node_exporter) and the [Erlang client library](https://github.com/deadtrickster/prometheus.erl).
+
+The data is then fed to the visualization and analytics platform [Grafana](https://grafana.com/).
+
+
+### Load testing
+
+With our system already in place, we begun testing our server with [Tsung](http://tsung.erlang-projects.org/user_manual/), a distributed load testing tool written in Erlang.
+
+Tsung requires testing specifications written in `XML` that describe the number of users to create, and how those users communicate with the server.
