@@ -56,7 +56,7 @@
   remote_user: root
   tasks:
     - name: install tsung
-      apt: 
+      apt:
         name: tsung
         state: latest
 

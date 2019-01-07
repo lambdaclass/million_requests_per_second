@@ -1,7 +1,7 @@
 ---
 
 - name: check installation
-  command: dpkg-query -S erlang
+  command: erl -version
   register: erlang_installed
   ignore_errors: true
   changed_when: false
