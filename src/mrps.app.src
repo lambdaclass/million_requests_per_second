@@ -7,7 +7,8 @@
    [kernel,
     stdlib,
     ranch,
-    beam_prometheus
+    beam_prometheus,
+    observer_cli
    ]},
   {env,[]},
   {modules, []},

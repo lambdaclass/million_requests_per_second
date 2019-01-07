@@ -5,8 +5,14 @@
   remote_user: root
   tags: "start-server"
   tasks:
-    - name: start server
-      command: "{{ install_path }}/bin/mrps start"
+    - name: restart server
+      block:
+      - name: stop running server
+        command: "{{ install_path }}/bin/mrps stop"
+        ignore_errors: yes
+
+      - name: start server
+        command: "{{ install_path }}/bin/mrps start"
       vars:
         install_path: /root/mrps
 
@@ -23,6 +29,10 @@
       vars:
         server: "{{ groups['server'][0] }}"
     
+    - name: stop tsung (if already running)
+      command: tsung stop
+      ignore_errors: yes
+      
     - name: begin load test
       command: tsung -f tsung.xml start
       args:

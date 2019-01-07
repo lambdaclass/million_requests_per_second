@@ -4,7 +4,7 @@
   git:
     repo: https://github.com/lambdaclass/million_requests_per_second.git
     dest: million_requests_per_second
-    # force: yes
+    force: yes
 
 - name: create sys.config
   template:
